@@ -1,5 +1,6 @@
 ﻿using MauiAppTempoAgora.Models;
 using Newtonsoft.Json.Linq;
+using System.Net;
 
 namespace MauiAppTempoAgora.Services
 {
@@ -12,7 +13,7 @@ namespace MauiAppTempoAgora.Services
             string chave = "6135072afe7f6cec1537d5cb08a5a1a2";
 
             string url = $"https://api.openweathermap.org/data/2.5/weather?" +
-                         $"q={cidade}&units=metric&appid={chave}";
+                         $"q={cidade}&units=metric&appid={chave}&lang=pt_br"; /*Adicionei &lang=pt_br para a descrição vir em português*/
 
 
             using (HttpClient client = new HttpClient())/*permite que se faça uma consulta na internet
@@ -20,16 +21,17 @@ namespace MauiAppTempoAgora.Services
             {
                 HttpResponseMessage resp = await client.GetAsync(url);
 
-                if (resp.IsSuccessStatusCode) /*verificação para saber se foi obtido uma resposta positiva do servidor, ou seja, ele não deu erro e entregou uma resposta*/ 
+                if (resp.IsSuccessStatusCode) /*verificação para saber se foi obtido uma resposta positiva do servidor, ou seja, 
+                                               * ele não deu erro e entregou uma resposta*/ 
                 { 
                     string json = await resp.Content.ReadAsStringAsync();
 
                     var rascunho = JObject.Parse(json);
-
-                    DateTime time = new();
-                    DateTime sunrise = time.AddSeconds((double)rascunho["sys"]["sunrise"]).ToLocalTime();
-                    DateTime sunset = time.AddSeconds((double)rascunho["sys"]["sunset"]).ToLocalTime();
-                    /*todo esse processo foi feito por que o valor no Json esva vindo em segundos
+                    /* substituição do termo time no cálculo para epoca para evitar o erro de 1970 */
+                    DateTime epoca = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                    DateTime sunrise = epoca.AddSeconds((double)rascunho["sys"]["sunrise"]).ToLocalTime();
+                    DateTime sunset = epoca.AddSeconds((double)rascunho["sys"]["sunset"]).ToLocalTime();
+                    /* todo esse processo foi feito por que o valor no Json esva vindo em segundos
                      a partir da famosa data 01/01/1970 chamada timestamp */
 
                     t = new()
@@ -46,6 +48,11 @@ namespace MauiAppTempoAgora.Services
                         sunset = sunset.ToString(),
                     }; //Fecha objeto do tempo
                 } // Fecha o if caso o status do servidor seja de sucesso
+                else if (resp.StatusCode == HttpStatusCode.NotFound) /* caso a API responda mas não obtenha sucesso, verifica se 
+                                                                      * o código é 404, ou seja, cidade inexistente */
+                {
+                    t = null; /* retornamos null para que a tela saiba que a cidade não existe */
+                }
             } // fecha o laço using
 
             return t;
